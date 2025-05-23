@@ -13,7 +13,6 @@ from pathlib import Path
 from typing import Annotated, Any, Callable, Literal, TypeVar
 import uuid
 
-
 import fastapi
 import logfire
 from supabase import create_client
@@ -142,7 +141,8 @@ R = TypeVar('R')
 
 @dataclass
 class Database:
-    user_id: str  # Supabase Auth user ID (pass this in `Depends` ideally)
+    user_id: str
+    window_size: int = 5
 
     async def add_messages(self, messages: bytes):
         await asyncio.to_thread(
@@ -157,14 +157,15 @@ class Database:
                 .table("messages")
                 .select("message_list")
                 .eq("user_id", self.user_id)
-                .order("created_at")
+                .order("created_at", desc=True)
+                .limit(self.window_size * 2)
                 .execute()
         )
         rows = resp.data or []
         messages: list[ModelMessage] = []
-        for row in rows:
+        for row in reversed(resp.data or []):
             messages.extend(ModelMessagesTypeAdapter.validate_python(row["message_list"]))
-        return messages
+        return messages[-self.window_size:]
 
 
 
@@ -174,11 +175,6 @@ if __name__ == '__main__':
     uvicorn.run(
         'pydantic_ai_examples.chat_app:app', reload=True, reload_dirs=[str(THIS_DIR)]
     )
-
-
-
-
-
 
 
 # def main():
