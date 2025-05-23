@@ -141,8 +141,7 @@ R = TypeVar('R')
 
 @dataclass
 class Database:
-    user_id: str
-    window_size: int = 5
+    user_id: str  # Supabase Auth user ID (pass this in `Depends` ideally)
 
     async def add_messages(self, messages: bytes):
         await asyncio.to_thread(
@@ -157,15 +156,14 @@ class Database:
                 .table("messages")
                 .select("message_list")
                 .eq("user_id", self.user_id)
-                .order("created_at", desc=True)
-                .limit(self.window_size * 2)
+                .order("created_at")
                 .execute()
         )
         rows = resp.data or []
         messages: list[ModelMessage] = []
-        for row in reversed(resp.data or []):
+        for row in rows:
             messages.extend(ModelMessagesTypeAdapter.validate_python(row["message_list"]))
-        return messages[-self.window_size:]
+        return messages
 
 
 
